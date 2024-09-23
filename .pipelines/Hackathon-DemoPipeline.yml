@@ -1,0 +1,88 @@
+# Disable automatic triggers
+trigger: none
+
+parameters:
+- name: region
+  displayName: 'Select Region'
+  type: string
+  values:
+  - australiaeast
+  - australiasoutheast
+  - westus
+  default: australiaeast
+ 
+- name: lockDuration
+  displayName: 'Lock Duration (in minutes)'
+  type: number
+  default: 1
+ 
+resources:
+  pipelines:
+  - pipeline: Hackathon-BuddyBuild
+    trigger: none
+    source: Hackathon-BuddyBuild
+    project: Squall
+    branch: main
+ 
+stages:
+  - stage: Test__westus
+    jobs:
+    - job: deploy_to_test_westus
+      displayName: Deploy Service
+      pool:
+        vmImage: 'windows-latest'
+      steps:
+      - download: Hackathon-BuddyBuild
+ 
+      # Set environment variables based on the user input from pipeline UI
+      - script: |
+          echo "Setting environment variables for region and lock duration"
+          echo ##vso[task.setvariable variable=SelectedRegion]${{ parameters.region }}
+          echo ##vso[task.setvariable variable=LockDuration]${{ parameters.lockDuration }}
+        displayName: 'Set Environment Variables'
+
+              # Map the secret variable as an environment variable
+      #- script: |
+         # echo "##vso[task.setvariable variable=CONNECTIONSTRING;issecret=true]$(CONNECTION_STRING)"
+      #  displayName: 'Map Secret Variable'
+
+      #Call the PowerShell script with the user-provided parameters
+      - task: PowerShell@2
+        inputs:
+            targetType: 'inline'
+            script: |
+              # Check if the region is locked
+                    ########################
+              $saDbHost = "tcp:hackdeploy.database.windows.net,1433"; # replace with host of your database server
+              $saDbUser = "hackdeploy"; # replace with your database username
+              $saDbName = "HackDeployGuard";      # database will be created if it doesn't exist
+              ########################
+              $saDbPass = "$(SA_DB_PASSWORD)";
+              $conString = "Server=$saDbHost;Initial Catalog=$saDbName;Persist Security Info=False;User ID=$saDbUser;Password=$saDbPass;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
+              Write-Host "ConectString $conString"
+              $query = "SELECT LockStatus, LockEndTime FROM LockTable WHERE region='${{ parameters.region }}'"
+              $regionStatus = Invoke-Sqlcmd -ConnectionString $conString -Query $query
+
+              if ($regionStatus.LockStatus -eq $true) {
+                  $endTime = $regionStatus.LockEndTime
+                  Write-Error "Region ${{ parameters.region }} is locked until $endTime. Please select a different region."
+                  exit 1
+              }
+
+              # Lock the selected region by updating the lock status and end time
+              $lockEndTime = (Get-Date).AddMinutes($LockDuration).ToString("yyyy-MM-dd HH:mm:ss")
+              $updateQuery = "UPDATE LockTable SET LockStatus=1, LockEndTime='$lockEndTime' WHERE Region='${{ parameters.region }}'"
+              Invoke-Sqlcmd -ConnectionString $conString -Query $updateQuery
+              #Write-Host "LockStatus after update: $($.LockStatus)"
+
+              Write-Host "Region ${{ parameters.region }} locked until $lockEndTime"
+
+     # Simulate deployment with a delay and success message
+      - task: PowerShell@2
+        displayName: "Simulate Deployment"
+        inputs:
+          targetType: 'inline'
+          script: |
+            Write-Host "Starting deployment to region ${{ parameters.region }}..."
+            Start-Sleep -Seconds 30
+            Write-Host "Successfully deployed to region ${{ parameters.region }} after a 30-second delay."

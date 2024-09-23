@@ -1,0 +1,11 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/TestApp/.vs/TestApp
+/.vs
+/TestConsoleApp/.vs/TestConsoleApp
+/TestConsoleApp/obj/Debug/net8.0/TestConsoleApp.AssemblyInfo.cs
+/TestConsoleApp/obj/Debug/net8.0/TestConsoleApp.AssemblyInfoInputs.cache
+/TestApp/obj/Debug/net8.0
+TestApp/obj/Debug/net8.0/TestApp.AssemblyInfo.cs

@@ -1,0 +1,40 @@
+# azure-pipelines.yml
+trigger:
+  branches:
+    include:
+      - main   # Or your default branch name
+ 
+pool:
+  vmImage: 'windows-latest'  # Use 'ubuntu-latest' if it's a .NET Core app
+ 
+steps:
+- task: UseDotNet@2
+  inputs:
+    packageType: 'sdk'
+    version: '8.0.x'  # Specify the version of the .NET SDK you're using
+    installationPath: $(Agent.ToolsDirectory)/dotnet
+ 
+- task: DotNetCoreCLI@2
+  inputs:
+    command: 'restore'
+    projects: '**/*.csproj'
+ 
+- task: DotNetCoreCLI@2
+  inputs:
+    command: 'build'
+    projects: '**/*.csproj'
+    arguments: '--configuration Release'
+ 
+# Publish build output as artifacts
+- task: DotNetCoreCLI@2
+  inputs:
+    command: 'publish'
+    publishWebProjects: false
+    projects: '**/*.csproj'
+    arguments: '--configuration Release --output $(Build.SourcesDirectory)\out'
+ 
+- task: PublishBuildArtifacts@1
+  inputs:
+    pathToPublish: '$(Build.SourcesDirectory)\out'
+    artifactName: 'drop'
+    publishLocation: 'Container'
